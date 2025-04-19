@@ -236,6 +236,7 @@
     let destinationPosition = null;
     let suitableRoutes = [];
     let nearestStopMarker = null;
+    let currentPositionMarker = null;
 
     // Icon cho marker
     const locationIcon = L.icon({
@@ -258,7 +259,7 @@
       errorDiv.className = 'error-message';
       errorDiv.textContent = message;
       document.querySelector('.sidebar').prepend(errorDiv);
-      setTimeout(() => errorDiv.remove(), 3000);
+      setTimeout(() => errorDiv.remove(), 5000);
     }
 
     // Hàm tính khoảng cách Haversine (km)
@@ -331,9 +332,72 @@
       });
     }
 
-    // Di chuyển bản đồ về trung tâm
+    // Di chuyển bản đồ về vị trí hiện tại
     function centerMap() {
-      map.setView(mapCenter, 13);
+      if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        showError('Vui lòng truy cập qua HTTPS để sử dụng định vị!');
+        map.setView(mapCenter, 13);
+        return;
+      }
+
+      if (!navigator.geolocation) {
+        showError('Trình duyệt không hỗ trợ định vị!');
+        map.setView(mapCenter, 13);
+        return;
+      }
+
+      showError('Đang lấy vị trí hiện tại...');
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          currentPosition = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+
+          const loadingMessage = document.querySelector('.error-message');
+          if (loadingMessage && loadingMessage.textContent.includes('Đang lấy vị trí')) {
+            loadingMessage.remove();
+          }
+
+          map.setView([currentPosition.lat, currentPosition.lng], 15);
+
+          if (currentPositionMarker) {
+            map.removeLayer(currentPositionMarker);
+          }
+
+          currentPositionMarker = L.marker([currentPosition.lat, currentPosition.lng], { icon: locationIcon })
+            .addTo(map)
+            .bindPopup(`<b>Vị trí hiện tại</b><br>Vị trí: ${currentPosition.lat.toFixed(5)}, ${currentPosition.lng.toFixed(5)}`)
+            .openPopup();
+
+          showError('Đã xác định vị trí hiện tại!');
+        },
+        (error) => {
+          console.error('Lỗi lấy vị trí:', error);
+          let errorMessage = 'Không thể lấy vị trí hiện tại: ';
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage += 'Vui lòng cấp quyền truy cập vị trí trong trình duyệt.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage += 'Không thể xác định vị trí. Vui lòng kiểm tra tín hiệu GPS.';
+              break;
+            case error.TIMEOUT:
+              errorMessage += 'Yêu cầu vị trí hết thời gian. Vui lòng thử lại.';
+              break;
+            default:
+              errorMessage += error.message;
+          }
+          showError(errorMessage);
+          map.setView(mapCenter, 13);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
     }
 
     // Tải dữ liệu lộ trình
