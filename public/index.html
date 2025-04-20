@@ -176,17 +176,6 @@
     
     <div class="content">
       <div class="sidebar">
-        <!-- Form tìm đường -->
-        <div class="route-finder">
-          <h3>Tìm đường đi</h3>
-          <div class="form-group">
-            <label for="destinationInput">Điểm đích:</label>
-            <input type="text" id="destinationInput" placeholder="Nhập tọa độ (lat,lng)">
-          </div>
-          <button id="findRoutesBtn">Tìm chuyến xe</button>
-          <div id="routeResults" class="route-results"></div>
-        </div>
-        
         <!-- Form chọn lộ trình -->
         <div class="route-form">
           <h3>Chọn lộ trình</h3>
@@ -480,54 +469,7 @@
 
     // Tìm các tuyến xe phù hợp
     function findSuitableRoutes() {
-      const destinationInput = document.getElementById('destinationInput').value.trim();
-      if (!destinationInput) {
-        showError('Vui lòng nhập điểm đích!');
-        return;
-      }
-
-      const parsed = parseDestinationInput(destinationInput);
-      if (!parsed) {
-        showError('Định dạng điểm đích không hợp lệ! Nhập tọa độ dạng lat,lng.');
-        return;
-      }
-
-      destinationPosition = parsed;
-      suitableRoutes = [];
-
-      Object.entries(routesData).forEach(([routeId, route]) => {
-        for (const point of route) {
-          const distance = haversineDistance(destinationPosition.lat, destinationPosition.lng, point[0], point[1]);
-          if (distance <= 0.5) {
-            suitableRoutes.push(routeId);
-            break;
-          }
-        }
-      });
-
-      const routeResults = document.getElementById('routeResults');
-      routeResults.innerHTML = suitableRoutes.length === 0 ? '<p>Không tìm thấy tuyến xe phù hợp!</p>' : '';
-
-      suitableRoutes.forEach(routeId => {
-        const routeItem = document.createElement('div');
-        routeItem.className = 'route-result-item';
-        routeItem.innerHTML = `<strong>Tuyến ${routeId}</strong>`;
-        routeItem.addEventListener('click', () => {
-          document.getElementById('routeSelect').value = routeId;
-          showRoute();
-          findNearestStopForRoute(routeId);
-        });
-        routeResults.appendChild(routeItem);
-      });
-
-      if (destinationPosition) {
-        if (markers['destination']) map.removeLayer(markers['destination']);
-        markers['destination'] = L.marker([destinationPosition.lat, destinationPosition.lng], { icon: locationIcon })
-          .addTo(map)
-          .bindPopup(`<b>Điểm đích</b><br>Vị trí: ${destinationPosition.lat.toFixed(5)}, ${destinationPosition.lng.toFixed(5)}`)
-          .openPopup();
-        map.setView([destinationPosition.lat, destinationPosition.lng], 15);
-      }
+      showError('Chức năng tìm tuyến xe đã bị xóa do bỏ phần nhập điểm đích.');
     }
 
     // Tìm bến xe gần nhất cho tuyến
@@ -631,12 +573,11 @@
     document.getElementById('showRouteBtn').addEventListener('click', showRoute);
     document.getElementById('centerMapBtn').addEventListener('click', centerMap);
     document.getElementById('findNearestStopBtn').addEventListener('click', findNearestStop);
-    document.getElementById('findRoutesBtn').addEventListener('click', findSuitableRoutes);
 
     // Tải dữ liệu khi khởi động
     window.addEventListener('load', loadLocations);
     window.addEventListener('load', loadRoutes);
     setInterval(loadLocations, 10000);
   </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9331c9673f817b99',t:'MTc0NTEyMjE3Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
