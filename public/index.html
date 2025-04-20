@@ -261,12 +261,26 @@
       popupAnchor: [1, -34]
     });
     
-    // Icon cho các điểm dừng trên lộ trình
+    // Icon cho xe buýt (màu đỏ) và điểm dừng trên lộ trình
+    const busIcon = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34]
+    });
+    
     const busStopIcon = L.icon({
-      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-      iconSize: [20, 32], // Kích thước nhỏ hơn marker chính
-      iconAnchor: [10, 32],
-      popupAnchor: [1, -30]
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png', // Màu xanh cho bến xe
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34]
+    });
+
+    const busStopIconActive = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', // Màu đỏ khi trùng với API
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34]
     });
 
     // Hàm hiển thị lỗi
@@ -291,7 +305,7 @@
     }
 
     // Hàm giảm số lượng waypoints để tránh định tuyến không cần thiết
-    function simplifyWaypoints(points, maxWaypoints = 10) {
+    function simplifyWaypoints(points, maxWaypoints = 5) { // Giảm xuống 5 để cải thiện định tuyến
       if (points.length <= maxWaypoints) return points;
       const step = Math.floor(points.length / (maxWaypoints - 1));
       const simplified = [];
@@ -306,35 +320,34 @@
     }
 
     // Hàm tính khoảng cách từ 1 điểm tới 1 đoạn thẳng (đơn vị: km)
-  function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
-    const A = px - x1;
-    const B = py - y1;
-    const C = x2 - x1;
-    const D = y2 - y1;
+    function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
+      const A = px - x1;
+      const B = py - y1;
+      const C = x2 - x1;
+      const D = y2 - y1;
 
-    const dot = A * C + B * D;
-    const len_sq = C * C + D * D;
-    let param = -1;
-    if (len_sq !== 0) param = dot / len_sq;
+      const dot = A * C + B * D;
+      const len_sq = C * C + D * D;
+      let param = -1;
+      if (len_sq !== 0) param = dot / len_sq;
 
-    let xx, yy;
-    if (param < 0) {
-      xx = x1;
-      yy = y1;
-    } else if (param > 1) {
-      xx = x2;
-      yy = y2;
-    } else {
-      xx = x1 + param * C;
-      yy = y1 + param * D;
+      let xx, yy;
+      if (param < 0) {
+        xx = x1;
+        yy = y1;
+      } else if (param > 1) {
+        xx = x2;
+        yy = y2;
+      } else {
+        xx = x1 + param * C;
+        yy = y1 + param * D;
+      }
+
+      const dx = px - xx;
+      const dy = py - yy;
+      return Math.sqrt(dx * dx + dy * dy) * 111.32; // Chuyển từ độ sang km
     }
-
-    const dx = px - xx;
-    const dy = py - yy;
-    return Math.sqrt(dx * dx + dy * dy) * 111.32; // Chuyển từ độ sang km
-  }
-
-
+    
     // Tải dữ liệu vị trí từ API và xác định tuyến phù hợp
     async function loadLocations() {
       try {
@@ -342,11 +355,16 @@
         if (!response.ok) throw new Error(`Lỗi: ${response.status}`);
         const data = await response.json();
     
-        // Xóa marker cũ
+        // Xóa marker cũ của xe buýt
         Object.values(markers).forEach(marker => map.removeLayer(marker));
         Object.keys(markers).forEach(id => delete markers[id]);
     
         allowedRoute = null;
+    
+        // Đặt tất cả marker bến xe về màu xanh mặc định trước khi kiểm tra
+        routeStopMarkers.forEach(stopMarker => {
+          stopMarker.marker.setIcon(busStopIcon);
+        });
     
         Object.entries(data).forEach(([busId, location]) => {
           if (typeof location.lat !== 'number' || typeof location.lng !== 'number') return;
@@ -354,7 +372,7 @@
           const label = `Xe buýt ${busId}`;
           const timestamp = new Date(location.timestamp).toLocaleString();
     
-          // === Xác định tuyến gần nhất dựa vào lộ trình ===
+          // Xác định tuyến gần nhất dựa vào lộ trình
           for (const [routeId, route] of Object.entries(routesData)) {
             for (let i = 0; i < route.length - 1; i++) {
               const d = pointToSegmentDistance(
@@ -378,10 +396,21 @@
               lng: location.lng,
               timestamp: timestamp
             };
-            markers[loc.id] = L.marker([loc.lat, loc.lng], { icon: locationIcon })
+            // Vẽ marker cho xe buýt (màu đỏ)
+            markers[loc.id] = L.marker([loc.lat, loc.lng], { icon: busIcon })
               .addTo(map)
               .bindPopup(`<b>${loc.label}</b><br>Vị trí: ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}<br>Thời gian: ${loc.timestamp}`);
-            }
+    
+            // Kiểm tra xem vị trí xe buýt có trùng với bến nào không
+            routeStopMarkers.forEach(stopMarker => {
+              const stopLat = stopMarker.lat;
+              const stopLng = stopMarker.lng;
+              const distance = haversineDistance(location.lat, location.lng, stopLat, stopLng);
+              if (distance < 0.01) { // Ngưỡng 10m
+                stopMarker.marker.setIcon(busStopIconActive); // Đặt màu đỏ cho bến
+              }
+            });
+          }
         });
     
         updateRouteSelect();
@@ -390,37 +419,52 @@
         showError('Không thể tải dữ liệu: ' + error.message);
       }
     }
+
+    // Vẽ lộ trình cho tuyến được phép
     function drawRouteForAllowedRoute() {
-      if (!allowedRoute) return;
+      if (!allowedRoute) {
+        showError('Không có tuyến xe buýt nào được phép hiển thị!');
+        return;
+      }
     
       const route = routesData[allowedRoute];
-      if (!route || route.length === 0) return;
+      if (!route || route.length === 0) {
+        showError('Không có dữ liệu lộ trình cho tuyến ' + allowedRoute);
+        return;
+      }
     
       if (currentRouteControl) {
-        map.removeLayer(currentRouteControl);
+        map.removeControl(currentRouteControl);
         currentRouteControl = null;
       }
     
-      const latlngs = route.map(point => [point[0], point[1]]);
-      currentRouteControl = L.polyline(latlngs, {
-        color: '#ff0000',   // 🔥 Highlight bằng màu đỏ
-        weight: 6,
-        opacity: 0.9,
-        smoothFactor: 1
+      const waypoints = simplifyWaypoints(route.map(point => L.latLng(point[0], point[1])));
+      currentRouteControl = L.Routing.control({
+        waypoints: waypoints,
+        lineOptions: { styles: [{ color: '#ff0000', weight: 6, opacity: 0.9 }] },
+        router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+        show: false,
+        addWaypoints: false,
+        fitSelectedRoutes: true
+      }).on('routingerror', (err) => {
+        showError('Lỗi định tuyến: ' + (err.error.message || 'Không thể tính toán lộ trình!'));
       }).addTo(map);
     
-      // Hiển thị các điểm dừng (marker) nếu muốn
+      // Hiển thị các điểm dừng (marker)
       clearRouteStopMarkers();
       route.forEach((point, index) => {
         const marker = L.marker([point[0], point[1]], { icon: busStopIcon })
           .addTo(map)
           .bindPopup(`Trạm ${index + 1}`);
-        routeStopMarkers.push(marker);
+        routeStopMarkers.push({
+          marker: marker,
+          lat: point[0],
+          lng: point[1]
+        });
       });
     
-      map.fitBounds(currentRouteControl.getBounds());
+      map.fitBounds(new L.LatLngBounds(waypoints));
     }
-    
 
     // Cập nhật dropdown tuyến
     function updateRouteSelect() {
@@ -521,7 +565,7 @@
 
     // Xóa tất cả các marker điểm dừng
     function clearRouteStopMarkers() {
-      routeStopMarkers.forEach(marker => map.removeLayer(marker));
+      routeStopMarkers.forEach(stopMarker => map.removeLayer(stopMarker.marker));
       routeStopMarkers = [];
       areMarkersVisible = false;
       document.getElementById('showAllMarkersBtn').textContent = 'Hiển thị tất cả điểm dừng';
@@ -529,13 +573,15 @@
 
     // Hàm hiển thị tất cả điểm dừng trong lộ trình
     function displayAllRouteStops(route, routeId) {
-      // Tạo và thêm marker cho mỗi điểm trong lộ trình
       route.forEach((point, index) => {
         const marker = L.marker([point[0], point[1]], { icon: busStopIcon })
           .addTo(map)
           .bindPopup(`<b>Điểm dừng ${index + 1}</b><br>Tuyến: ${routeId}<br>Vị trí: ${point[0].toFixed(5)}, ${point[1].toFixed(5)}`);
-        
-        routeStopMarkers.push(marker);
+        routeStopMarkers.push({
+          marker: marker,
+          lat: point[0],
+          lng: point[1]
+        });
       });
       areMarkersVisible = true;
       document.getElementById('showAllMarkersBtn').textContent = 'Ẩn tất cả điểm dừng';
@@ -563,8 +609,7 @@
     }
 
     // Hiển thị lộ trình
-
-    let currentMarkers = []; // <--- Thêm dòng này để lưu các markers
+    let currentMarkers = [];
     
     function showRoute() {
       const routeId = document.getElementById('routeSelect').value;
@@ -573,43 +618,47 @@
         return;
       }
     
-      // Xóa route cũ nếu có
       if (currentRouteControl) {
-        map.removeLayer(currentRouteControl);
+        map.removeControl(currentRouteControl);
         currentRouteControl = null;
       }
     
-      // Xóa tất cả marker cũ
       currentMarkers.forEach(marker => map.removeLayer(marker));
       currentMarkers = [];
     
       const route = routesData[routeId];
       if (route && route.length > 0) {
-        const latlngs = route.map(point => [point[0], point[1]]);
+        const waypoints = simplifyWaypoints(route.map(point => L.latLng(point[0], point[1])));
         const routeColor = routeColors[routeId] || '#000000';
     
-        // Vẽ polyline
-        currentRouteControl = L.polyline(latlngs, {
-          color: routeColor,
-          weight: 4,
-          opacity: 0.7,
-          smoothFactor: 1
+        currentRouteControl = L.Routing.control({
+          waypoints: waypoints,
+          lineOptions: { styles: [{ color: routeColor, weight: 4, opacity: 0.7 }] },
+          router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+          show: false,
+          addWaypoints: false,
+          fitSelectedRoutes: true
+        }).on('routingerror', (err) => {
+          showError('Lỗi định tuyến: ' + (err.error.message || 'Không thể tính toán lộ trình!'));
         }).addTo(map);
     
-        // Tạo marker cho mỗi trạm
         route.forEach((point, index) => {
-          const marker = L.marker([point[0], point[1]]).addTo(map)
+          const marker = L.marker([point[0], point[1]], { icon: busStopIcon })
+            .addTo(map)
             .bindPopup(`Trạm ${index + 1}`);
           currentMarkers.push(marker);
+          routeStopMarkers.push({
+            marker: marker,
+            lat: point[0],
+            lng: point[1]
+          });
         });
     
-        // Zoom cho vừa polyline
-        map.fitBounds(currentRouteControl.getBounds());
+        map.fitBounds(new L.LatLngBounds(waypoints));
       } else {
         showError('Không có dữ liệu lộ trình cho tuyến ' + routeId);
       }
     }
-    
 
     // Tìm bến xe gần nhất cho tuyến
     function findNearestStopForRoute(routeId) {
@@ -700,6 +749,8 @@
         show: false,
         addWaypoints: false,
         fitSelectedRoutes: true
+      }).on('routingerror', (err) => {
+        showError('Lỗi định tuyến: ' + (err.error.message || 'Không thể tính toán đường đi đến bến xe!'));
       }).addTo(map);
     }
 
@@ -715,32 +766,21 @@
 
     // Xóa tất cả marker và lộ trình
     function clearAllMarkers() {
-      // Xóa marker xe buýt
       Object.values(markers).forEach(marker => map.removeLayer(marker));
       Object.keys(markers).forEach(id => delete markers[id]);
-      
-      // Xóa marker điểm dừng
       clearRouteStopMarkers();
-      
-      // Xóa marker vị trí hiện tại
       if (currentPositionMarker) {
         map.removeLayer(currentPositionMarker);
         currentPositionMarker = null;
       }
-      
-      // Xóa marker điểm dừng gần nhất
       if (nearestStopMarker) {
         map.removeLayer(nearestStopMarker);
         nearestStopMarker = null;
       }
-      
-      // Xóa lộ trình hiện tại
       if (currentRouteControl) {
         map.removeControl(currentRouteControl);
         currentRouteControl = null;
       }
-      
-      // Xóa lộ trình đến điểm gần nhất
       if (routeToNearestStopControl) {
         map.removeControl(routeToNearestStopControl);
         routeToNearestStopControl = null;
@@ -764,5 +804,5 @@
     window.addEventListener('load', loadRoutes);
     setInterval(loadLocations, 10000);
   </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93348dcda8c0bfa2',t:'MTc0NTE1MTE4OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9334af824cf0bd54',t:'MTc0NTE1MjU2OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
