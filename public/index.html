@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hiển thị vị trí</title>
+  <title>BUSMAP</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
   <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
@@ -24,22 +24,67 @@
     .header {
       background-color: #0066cc;
       color: white;
-      padding: 15px;
+      padding: 10px;
       text-align: center;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    
+    .header h1 {
+      font-size: 1.5em;
+      margin: 0;
+      flex: 1;
+      text-align: center;
     }
     
     .content {
       display: flex;
       flex: 1;
+      position: relative;
     }
     
     .sidebar {
+      width: 0;
+      transition: width 0.3s;
+      position: absolute;
+      height: 100%;
+      z-index: 1000;
+      overflow: hidden;
+    }
+    
+    .sidebar.open {
       width: 300px;
+    }
+    
+    .sidebar-content {
       padding: 15px;
       background-color: #f5f5f5;
       box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-      overflow-y: auto;
+      display: none;
+      height: 100%;
+    }
+    
+    .sidebar.open .sidebar-content {
+      display: block;
+    }
+    
+    .menu-toggle {
+      width: 50px;
+      height: 50px;
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      position: absolute;
+      left: 10px;
+    }
+    
+    .menu-toggle:hover {
+      background-color: #0055aa;
     }
     
     #map {
@@ -47,7 +92,7 @@
       height: 100%;
     }
     
-    .route-finder, .route-form, .nearest-stop, .location-history {
+    .route-finder, .route-form, .nearest-stop {
       margin-bottom: 20px;
     }
     
@@ -99,34 +144,6 @@
       background-color: #f0f0f0;
     }
     
-    .location-history {
-      margin-top: 20px;
-    }
-    
-    .location-item {
-      padding: 10px;
-      background-color: white;
-      border-radius: 4px;
-      margin-bottom: 10px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      cursor: pointer;
-    }
-    
-    .location-item:hover {
-      background-color: #f0f0f0;
-    }
-    
-    .location-label {
-      font-weight: bold;
-      color: #0066cc;
-    }
-    
-    .location-info {
-      font-size: 12px;
-      color: #666;
-      margin-top: 5px;
-    }
-    
     .center-btn {
       margin-top: 10px;
       background-color: #28a745;
@@ -134,17 +151,6 @@
     
     .center-btn:hover {
       background-color: #218838;
-    }
-    
-    .delete-btn {
-      background-color: #dc3545;
-      margin-top: 5px;
-      padding: 5px;
-      width: auto;
-    }
-    
-    .delete-btn:hover {
-      background-color: #c82333;
     }
     
     .error-message {
@@ -171,35 +177,32 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>Hiển thị vị trí</h1>
+      <button class="menu-toggle">☰</button>
+      <h1>Busmap</h1>
     </div>
     
     <div class="content">
       <div class="sidebar">
-        <!-- Form chọn lộ trình -->
-        <div class="route-form">
-          <h3>Chọn lộ trình</h3>
-          <div class="form-group">
-            <label for="routeSelect">Tuyến xe buýt:</label>
-            <select id="routeSelect">
-              <option value="">-- Chọn tuyến --</option>
-            </select>
+        <div class="sidebar-content">
+          <!-- Form chọn lộ trình -->
+          <div class="route-form">
+            <h3>Chọn lộ trình</h3>
+            <div class="form-group">
+              <label for="routeSelect">Tuyến xe buýt:</label>
+              <select id="routeSelect">
+                <option value="">-- Chọn tuyến --</option>
+              </select>
+            </div>
+            <button id="showRouteBtn">Hiển thị lộ trình</button>
+            <button id="centerMapBtn" class="center-btn">Về trung tâm bản đồ</button>
           </div>
-          <button id="showRouteBtn">Hiển thị lộ trình</button>
-          <button id="centerMapBtn" class="center-btn">Về trung tâm bản đồ</button>
-        </div>
-        
-        <!-- Tìm bến xe gần nhất -->
-        <div class="nearest-stop">
-          <h3>Tìm bến xe gần nhất</h3>
-          <button id="findNearestStopBtn">Tìm bến gần nhất</button>
-          <div id="nearestStopInfo"></div>
-        </div>
-        
-        <!-- Danh sách vị trí -->
-        <div class="location-history">
-          <h3>Danh sách vị trí</h3>
-          <div id="locationList"></div>
+          
+          <!-- Tìm bến xe gần nhất -->
+          <div class="nearest-stop">
+            <h3>Tìm bến xe gần nhất</h3>
+            <button id="findNearestStopBtn">Tìm bến gần nhất</button>
+            <div id="nearestStopInfo"></div>
+          </div>
         </div>
       </div>
       
@@ -209,23 +212,28 @@
   
   <script>
     // Khởi tạo bản đồ
-    const map = L.map('map').setView([21.027763, 105.83416], 13);
+    const map = L.map('map', {
+      zoomControl: false // Tắt điều khiển zoom mặc định để tùy chỉnh vị trí
+    }).setView([21.027763, 105.83416], 13);
     const mapCenter = [21.027763, 105.83416];
+
+    // Thêm điều khiển zoom ở góc trên bên phải
+    L.control.zoom({
+      position: 'topright'
+    }).addTo(map);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
     // Lưu trữ dữ liệu
-    const locations = [];
     const markers = {};
     let currentRouteControl = null;
     let routeToNearestStopControl = null;
     let currentPosition = null;
-    let destinationPosition = null;
-    let suitableRoutes = [];
     let nearestStopMarker = null;
     let currentPositionMarker = null;
+    let allowedRoute = null;
 
     // Icon cho marker
     const locationIcon = L.icon({
@@ -247,7 +255,7 @@
       const errorDiv = document.createElement('div');
       errorDiv.className = 'error-message';
       errorDiv.textContent = message;
-      document.querySelector('.sidebar').prepend(errorDiv);
+      document.querySelector('.sidebar-content').prepend(errorDiv);
       setTimeout(() => errorDiv.remove(), 5000);
     }
 
@@ -263,7 +271,22 @@
       return R * c;
     }
 
-    // Tải dữ liệu vị trí từ API
+    // Hàm giảm số lượng waypoints để tránh định tuyến không cần thiết
+    function simplifyWaypoints(points, maxWaypoints = 10) {
+      if (points.length <= maxWaypoints) return points;
+      const step = Math.floor(points.length / (maxWaypoints - 1));
+      const simplified = [];
+      for (let i = 0; i < points.length; i += step) {
+        simplified.push(points[i]);
+      }
+      // Đảm bảo điểm cuối được thêm vào
+      if (simplified[simplified.length - 1] !== points[points.length - 1]) {
+        simplified.push(points[points.length - 1]);
+      }
+      return simplified;
+    }
+
+    // Tải dữ liệu vị trí từ API và xác định tuyến phù hợp
     async function loadLocations() {
       try {
         const response = await fetch('https://busmapmini.onrender.com/api/buses');
@@ -271,54 +294,59 @@
         const data = await response.json();
 
         Object.values(markers).forEach(marker => map.removeLayer(marker));
-        locations.length = 0;
         Object.keys(markers).forEach(id => delete markers[id]);
 
+        allowedRoute = null;
         Object.entries(data).forEach(([busId, location]) => {
           if (typeof location.lat !== 'number' || typeof location.lng !== 'number') return;
           const label = `Xe buýt ${busId}`;
           const timestamp = new Date(location.timestamp).toLocaleString();
-          const loc = {
-            id: `bus_${busId}`,
-            label: label,
-            lat: location.lat,
-            lng: location.lng,
-            timestamp: timestamp
-          };
-          locations.push(loc);
-          markers[loc.id] = L.marker([loc.lat, loc.lng], { icon: locationIcon })
-            .addTo(map)
-            .bindPopup(`<b>${loc.label}</b><br>Vị trí: ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}<br>Thời gian: ${loc.timestamp}`);
+          
+          // Xác định tuyến phù hợp dựa trên vị trí
+          for (const [routeId, route] of Object.entries(routesData)) {
+            const minDistance = Math.min(...route.map(point => 
+              haversineDistance(location.lat, location.lng, point[0], point[1])
+            ));
+            if (minDistance < 0.1) { // Ngưỡng 100m
+              allowedRoute = routeId;
+              break;
+            }
+          }
+
+          if (allowedRoute) {
+            const loc = {
+              id: `bus_${busId}`,
+              label: label,
+              lat: location.lat,
+              lng: location.lng,
+              timestamp: timestamp
+            };
+            markers[loc.id] = L.marker([loc.lat, loc.lng], { icon: locationIcon })
+              .addTo(map)
+              .bindPopup(`<b>${loc.label}</b><br>Vị trí: ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}<br>Thời gian: ${loc.timestamp}`);
+          }
         });
 
-        updateLocationList();
+        // Cập nhật dropdown tuyến
+        updateRouteSelect();
       } catch (error) {
         console.error('Lỗi tải vị trí:', error);
-        showError('Không thể tải danh sách vị trí: ' + error.message);
+        showError('Không thể tải dữ liệu: ' + error.message);
       }
     }
 
-    // Cập nhật danh sách vị trí
-    function updateLocationList() {
-      const locationListElement = document.getElementById('locationList');
-      locationListElement.innerHTML = locations.length === 0 ? '<p>Chưa có vị trí nào.</p>' : '';
-
-      locations.slice().reverse().forEach(location => {
-        const locationItem = document.createElement('div');
-        locationItem.className = 'location-item';
-        locationItem.innerHTML = `
-          <div class="location-label">${location.label}</div>
-          <div class="location-info">
-            Vị trí: ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}<br>
-            Thời gian: ${location.timestamp}
-          </div>
-        `;
-        locationItem.addEventListener('click', () => {
-          map.setView([location.lat, location.lng], 15);
-          markers[location.id].openPopup();
-        });
-        locationListElement.appendChild(locationItem);
-      });
+    // Cập nhật dropdown tuyến
+    function updateRouteSelect() {
+      const routeSelect = document.getElementById('routeSelect');
+      routeSelect.innerHTML = '<option value="">-- Chọn tuyến --</option>';
+      
+      if (allowedRoute) {
+        const option = document.createElement('option');
+        option.value = allowedRoute;
+        option.textContent = allowedRoute;
+        routeSelect.appendChild(option);
+        routeSelect.value = allowedRoute;
+      }
     }
 
     // Di chuyển bản đồ về vị trí hiện tại
@@ -391,7 +419,6 @@
 
     // Tải dữ liệu lộ trình
     let routesData = {};
-    const polylines = {};
     const routeColors = { 'BUS08': '#ff0000', 'BUS141': '#0000ff' };
 
     async function loadRoutes() {
@@ -399,14 +426,6 @@
         const response = await fetch('/routes.json');
         if (!response.ok) throw new Error(`Lỗi: ${response.status}`);
         routesData = await response.json();
-
-        const routeSelect = document.getElementById('routeSelect');
-        Object.keys(routesData).forEach(routeId => {
-          const option = document.createElement('option');
-          option.value = routeId;
-          option.textContent = routeId;
-          routeSelect.appendChild(option);
-        });
       } catch (error) {
         console.error('Lỗi tải lộ trình:', error);
         showError('Không thể tải dữ liệu lộ trình: ' + error.message);
@@ -421,61 +440,58 @@
         return;
       }
 
+      if (routeId !== allowedRoute) {
+        showError('Tuyến xe không hợp lệ cho vị trí hiện tại!');
+        return;
+      }
+
       if (currentRouteControl) {
         map.removeControl(currentRouteControl);
         currentRouteControl = null;
       }
 
-      Object.values(polylines).forEach(polyline => map.removeLayer(polyline));
-      Object.keys(polylines).forEach(id => delete polylines[id]);
-
       const route = routesData[routeId];
       if (route && route.length > 0) {
-        const step = Math.max(1, Math.floor(route.length / 5));
-        const waypoints = [];
-        for (let i = 0; i < route.length; i += step) {
-          waypoints.push(L.latLng(route[i][0], route[i][1]));
-        }
-        if (waypoints[waypoints.length - 1].lat !== route[route.length - 1][0]) {
-          waypoints.push(L.latLng(route[route.length - 1][0], route[route.length - 1][1]));
+        // Tạo waypoints từ dữ liệu lộ trình và giảm số lượng để tránh định tuyến vòng
+        const allWaypoints = route.map(point => L.latLng(point[0], point[1]));
+        const waypoints = simplifyWaypoints(allWaypoints, 5); // Giới hạn tối đa 5 waypoints
+        
+        // Đảm bảo có ít nhất 2 điểm để vẽ lộ trình
+        if (waypoints.length < 2) {
+          showError('Dữ liệu lộ trình không đủ để vẽ tuyến ' + routeId);
+          return;
         }
 
         const routeColor = routeColors[routeId] || '#000000';
         currentRouteControl = L.Routing.control({
           waypoints: waypoints,
           lineOptions: { styles: [{ color: routeColor, weight: 4 }] },
-          router: L.Routing.osrmv1({ serviceUrl: 'http://router.project-osrm.org/route/v1' }),
+          router: L.Routing.osrmv1({
+            serviceUrl: 'https://router.project-osrm.org/route/v1',
+            profile: 'driving' // Đảm bảo sử dụng profile driving
+          }),
           show: false,
           addWaypoints: false,
-          fitSelectedRoutes: true
+          fitSelectedRoutes: true,
+          createMarker: () => null // Không tạo marker mặc định
+        }).on('routingerror', function(e) {
+          console.error('Lỗi định tuyến:', e.error);
+          showError('Không thể định tuyến: ' + e.error.message);
         }).addTo(map);
       } else {
         showError('Không có dữ liệu lộ trình cho tuyến ' + routeId);
       }
     }
 
-    // Parse input điểm đích
-    function parseDestinationInput(input) {
-      const coordsMatch = input.match(/^\s*([-]?\d*\.?\d+),\s*([-]?\d*\.?\d+)\s*$/);
-      if (coordsMatch) {
-        const lat = parseFloat(coordsMatch[1]);
-        const lng = parseFloat(coordsMatch[2]);
-        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-          return { lat, lng };
-        }
-      }
-      return null;
-    }
-
-    // Tìm các tuyến xe phù hợp
-    function findSuitableRoutes() {
-      showError('Chức năng tìm tuyến xe đã bị xóa do bỏ phần nhập điểm đích.');
-    }
-
     // Tìm bến xe gần nhất cho tuyến
     function findNearestStopForRoute(routeId) {
       if (!routeId) {
         showError('Vui lòng chọn tuyến xe buýt!');
+        return;
+      }
+
+      if (routeId !== allowedRoute) {
+        showError('Tuyến xe không hợp lệ cho vị trí hiện tại!');
         return;
       }
 
@@ -552,14 +568,14 @@
       routeToNearestStopControl = L.Routing.control({
         waypoints: [L.latLng(start.lat, start.lng), L.latLng(end.lat, end.lng)],
         lineOptions: { styles: [{ color: '#28a745', weight: 4, dashArray: '5, 10' }] },
-        router: L.Routing.osrmv1({ serviceUrl: 'http://router.project-osrm.org/route/v1' }),
+        router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
         show: false,
         addWaypoints: false,
         fitSelectedRoutes: true
       }).addTo(map);
     }
 
-    // Tìm bến xe gần nhất (chức năng cũ)
+    // Tìm bến xe gần nhất
     function findNearestStop() {
       const routeId = document.getElementById('routeSelect').value;
       if (!routeId) {
@@ -568,6 +584,12 @@
       }
       findNearestStopForRoute(routeId);
     }
+
+    // Menu toggle
+    document.querySelector('.menu-toggle').addEventListener('click', () => {
+      const sidebar = document.querySelector('.sidebar');
+      sidebar.classList.toggle('open');
+    });
 
     // Sự kiện
     document.getElementById('showRouteBtn').addEventListener('click', showRoute);
@@ -579,5 +601,7 @@
     window.addEventListener('load', loadRoutes);
     setInterval(loadLocations, 10000);
   </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9332d74b5dbdbd3c',t:'MTc0NTEzMzIyNi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9333001a5f86676e',t:'MTc0NTEzNDg5OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
