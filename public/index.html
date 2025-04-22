@@ -372,15 +372,11 @@
           const label = `Xe buýt ${busId}`;
           const timestamp = new Date(location.timestamp).toLocaleString();
     
-          // Xác định tuyến gần nhất dựa vào lộ trình
+          // Xác định tuyến gần nhất dựa trên khoảng cách Haversine (bán kính 5km)
           for (const [routeId, route] of Object.entries(routesData)) {
-            for (let i = 0; i < route.length - 1; i++) {
-              const d = pointToSegmentDistance(
-                location.lat, location.lng,
-                route[i][0], route[i][1],
-                route[i+1][0], route[i+1][1]
-              );
-              if (d < 0.1) { // 100m
+            for (const point of route) {
+              const distance = haversineDistance(location.lat, location.lng, point[0], point[1]);
+              if (distance < 5) { // Trong bán kính 5km
                 allowedRoute = routeId;
                 break;
               }
@@ -804,5 +800,5 @@
     window.addEventListener('load', loadRoutes);
     setInterval(loadLocations, 10000);
   </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93348dcda8c0bfa2',t:'MTc0NTE1MTE4OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9334af824cf0bd54',t:'MTc0NTE1MjU2OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
