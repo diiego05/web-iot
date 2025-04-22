@@ -276,13 +276,6 @@
       popupAnchor: [1, -34]
     });
 
-    const busStopIconActive = L.icon({
-      iconUrl:  'https://cdn-icons-png.flaticon.com/512/1068/1068631.png', // Màu đỏ khi trùng với API
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34]
-    });
-
     // Hàm hiển thị lỗi
     function showError(message) {
       const errorDiv = document.createElement('div');
@@ -305,49 +298,19 @@
     }
 
     // Hàm giảm số lượng waypoints để tránh định tuyến không cần thiết
-    function simplifyWaypoints(points, maxWaypoints = 5) { // Giảm xuống 5 để cải thiện định tuyến
+    function simplifyWaypoints(points, maxWaypoints = 5) { 
       if (points.length <= maxWaypoints) return points;
       const step = Math.floor(points.length / (maxWaypoints - 1));
       const simplified = [];
       for (let i = 0; i < points.length; i += step) {
         simplified.push(points[i]);
       }
-      // Đảm bảo điểm cuối được thêm vào
       if (simplified[simplified.length - 1] !== points[points.length - 1]) {
         simplified.push(points[points.length - 1]);
       }
       return simplified;
     }
 
-    // Hàm tính khoảng cách từ 1 điểm tới 1 đoạn thẳng (đơn vị: km)
-    function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
-      const A = px - x1;
-      const B = py - y1;
-      const C = x2 - x1;
-      const D = y2 - y1;
-
-      const dot = A * C + B * D;
-      const len_sq = C * C + D * D;
-      let param = -1;
-      if (len_sq !== 0) param = dot / len_sq;
-
-      let xx, yy;
-      if (param < 0) {
-        xx = x1;
-        yy = y1;
-      } else if (param > 1) {
-        xx = x2;
-        yy = y2;
-      } else {
-        xx = x1 + param * C;
-        yy = y1 + param * D;
-      }
-
-      const dx = px - xx;
-      const dy = py - yy;
-      return Math.sqrt(dx * dx + dy * dy) * 111.32; // Chuyển từ độ sang km
-    }
-    
     // Tải dữ liệu vị trí từ API và xác định tuyến phù hợp
     async function loadLocations() {
       try {
@@ -361,30 +324,16 @@
     
         allowedRoute = null;
     
-        // Đặt tất cả marker bến xe về màu xanh mặc định trước khi kiểm tra
-        routeStopMarkers.forEach(stopMarker => {
-          stopMarker.marker.setIcon(busStopIcon);
-        });
-    
         Object.entries(data).forEach(([busId, location]) => {
           if (typeof location.lat !== 'number' || typeof location.lng !== 'number') return;
     
           const label = `Xe buýt ${busId}`;
           const timestamp = new Date(location.timestamp).toLocaleString();
     
-          // Xác định tuyến gần nhất dựa trên khoảng cách Haversine (bán kính 5km)
-          for (const [routeId, route] of Object.entries(routesData)) {
-            for (const point of route) {
-              const distance = haversineDistance(location.lat, location.lng, point[0], point[1]);
-              if (distance < 2) { // Trong bán kính 5km
-                allowedRoute = routeId;
-                break;
-              }
-            }
-            if (allowedRoute) break;
-          }
+          // Gán tuyến dựa trực tiếp trên busId
+          allowedRoute = busId; // Tuyến sẽ khớp với busId từ API
     
-          if (allowedRoute) {
+          if (allowedRoute && routesData[allowedRoute]) {
             const loc = {
               id: `bus_${busId}`,
               label: label,
@@ -396,16 +345,6 @@
             markers[loc.id] = L.marker([loc.lat, loc.lng], { icon: busIcon })
               .addTo(map)
               .bindPopup(`<b>${loc.label}</b><br>Vị trí: ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}<br>Thời gian: ${loc.timestamp}`);
-    
-            // Kiểm tra xem vị trí xe buýt có trùng với bến nào không
-            routeStopMarkers.forEach(stopMarker => {
-              const stopLat = stopMarker.lat;
-              const stopLng = stopMarker.lng;
-              const distance = haversineDistance(location.lat, location.lng, stopLat, stopLng);
-              if (distance < 0.01) { // Ngưỡng 10m
-                stopMarker.marker.setIcon(busStopIconActive); // Đặt màu đỏ cho bến
-              }
-            });
           }
         });
     
@@ -467,7 +406,7 @@
       const routeSelect = document.getElementById('routeSelect');
       routeSelect.innerHTML = '<option value="">-- Chọn tuyến --</option>';
       
-      if (allowedRoute) {
+      if (allowedRoute && routesData[allowedRoute]) {
         const option = document.createElement('option');
         option.value = allowedRoute;
         option.textContent = allowedRoute;
@@ -564,44 +503,6 @@
       routeStopMarkers.forEach(stopMarker => map.removeLayer(stopMarker.marker));
       routeStopMarkers = [];
       areMarkersVisible = false;
-      document.getElementById('showAllMarkersBtn').textContent = 'Hiển thị tất cả điểm dừng';
-    }
-
-    // Hàm hiển thị tất cả điểm dừng trong lộ trình
-    function displayAllRouteStops(route, routeId) {
-      route.forEach((point, index) => {
-        const marker = L.marker([point[0], point[1]], { icon: busStopIcon })
-          .addTo(map)
-          .bindPopup(`<b>Điểm dừng ${index + 1}</b><br>Tuyến: ${routeId}<br>Vị trí: ${point[0].toFixed(5)}, ${point[1].toFixed(5)}`);
-        routeStopMarkers.push({
-          marker: marker,
-          lat: point[0],
-          lng: point[1]
-        });
-      });
-      areMarkersVisible = true;
-      document.getElementById('showAllMarkersBtn').textContent = 'Ẩn tất cả điểm dừng';
-    }
-
-    // Hàm chuyển đổi hiển thị điểm dừng
-    function toggleRouteStopMarkers() {
-      const routeId = document.getElementById('routeSelect').value;
-      if (!routeId) {
-        showError('Vui lòng chọn tuyến xe buýt!');
-        return;
-      }
-
-      const route = routesData[routeId];
-      if (!route || route.length === 0) {
-        showError('Không có dữ liệu lộ trình cho tuyến ' + routeId);
-        return;
-      }
-
-      if (areMarkersVisible) {
-        clearRouteStopMarkers();
-      } else {
-        displayAllRouteStops(route, routeId);
-      }
     }
 
     // Hiển thị lộ trình
@@ -706,7 +607,8 @@
 
           const nearestStopInfo = document.getElementById('nearestStopInfo');
           nearestStopInfo.innerHTML = `
-            <div><strong>Bến xe gần nhất:</strong> Bến ${nearestIndex + 1} (Tuyến ${routeId})</div>
+            <div>
+            <strong>Bến xe gần nhất:</strong> Bến ${nearestIndex + 1} (Tuyến ${routeId})</div>
             <div><strong>Vị trí:</strong> ${nearestStop.lat.toFixed(5)}, ${nearestStop.lng.toFixed(5)}</div>
             <div><strong>Khoảng cách:</strong> ${minDistance.toFixed(2)} km</div>
             <button id="showRouteToStopBtn" class="center-btn">Hiển thị đường đi</button>
@@ -798,7 +700,7 @@
     // Tải dữ liệu khi khởi động
     window.addEventListener('load', loadLocations);
     window.addEventListener('load', loadRoutes);
-    setInterval(loadLocations, 10000);
+    setInterval(loadLocations, 5000); // Giảm từ 10000ms (10s) xuống 5000ms (5s)
   </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9341bc436b00456c',t:'MTc0NTI4OTQwNi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
