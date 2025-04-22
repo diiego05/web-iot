@@ -376,7 +376,7 @@
           for (const [routeId, route] of Object.entries(routesData)) {
             for (const point of route) {
               const distance = haversineDistance(location.lat, location.lng, point[0], point[1]);
-              if (distance < 5) { // Trong bán kính 5km
+              if (distance < 2) { // Trong bán kính 5km
                 allowedRoute = routeId;
                 break;
               }
