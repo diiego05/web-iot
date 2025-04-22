@@ -243,7 +243,7 @@
     let currentPosition = null;
     let nearestStopMarker = null;
     let currentPositionMarker = null;
-    let allowedRoutes = {}; // Lưu trữ các tuyến đang hoạt động và thời gian cập nhật
+    let allowedRoutes = {}; // Lưu trữ các tuyến đang hoạt động
     let areMarkersVisible = false;
 
     // Icon cho marker
@@ -319,7 +319,6 @@
     
         // Lưu trữ các tuyến hiện tại từ API
         const currentRoutes = new Set();
-        const now = Date.now();
     
         // Xóa marker cũ của xe buýt
         Object.values(markers).forEach(marker => map.removeLayer(marker));
@@ -335,11 +334,9 @@
           // Thêm tuyến vào danh sách tuyến hiện tại
           currentRoutes.add(busId);
     
-          // Cập nhật thời gian cho tuyến
+          // Thêm tuyến vào allowedRoutes nếu chưa có
           if (!allowedRoutes[busId]) {
-            allowedRoutes[busId] = { lastUpdated: now };
-          } else {
-            allowedRoutes[busId].lastUpdated = now;
+            allowedRoutes[busId] = {};
           }
     
           if (routesData[busId]) {
@@ -356,12 +353,16 @@
           }
         });
     
-        // Xóa các tuyến quá 60 giây
+        // Xóa các tuyến không còn trong API response
         Object.keys(allowedRoutes).forEach(routeId => {
-          if (!currentRoutes.has(routeId) && (now - allowedRoutes[routeId].lastUpdated) > 60000) {
+          if (!currentRoutes.has(routeId)) {
             // Xóa lộ trình và marker của tuyến nếu không được chọn
             if (routeControls[routeId]) {
-              map.removeControl(routeControls[routeId]);
+              try {
+                map.removeControl(routeControls[routeId]);
+              } catch (e) {
+                console.error('Lỗi khi xóa routeControls:', e);
+              }
               delete routeControls[routeId];
             }
             if (routeStopMarkers[routeId]) {
@@ -379,7 +380,7 @@
       }
     }
 
-    // Cập nhật dropdown tuyến
+    // Cập nhật dropdown tuyến và xóa bến xe gần nhất nếu tuyến bị xóa
     function updateRouteSelect() {
       const routeSelect = document.getElementById('routeSelect');
       const selectedRoute = routeSelect.value;
@@ -397,6 +398,34 @@
       // Khôi phục lựa chọn trước đó nếu tuyến vẫn tồn tại
       if (selectedRoute && allowedRoutes[selectedRoute]) {
         routeSelect.value = selectedRoute;
+      } else {
+        // Nếu tuyến được chọn không còn tồn tại, xóa lộ trình, marker và bến xe gần nhất
+        Object.keys(routeControls).forEach(routeId => {
+          try {
+            map.removeControl(routeControls[routeId]);
+          } catch (e) {
+            console.error('Lỗi khi xóa routeControls:', e);
+          }
+          delete routeControls[routeId];
+        });
+        Object.keys(routeStopMarkers).forEach(routeId => {
+          clearRouteStopMarkers(routeId);
+        });
+        // Xóa marker và thông tin bến xe gần nhất
+        if (nearestStopMarker) {
+          map.removeLayer(nearestStopMarker);
+          nearestStopMarker = null;
+        }
+        if (routeToNearestStopControl) {
+          try {
+            map.removeControl(routeToNearestStopControl);
+          } catch (e) {
+            console.error('Lỗi khi xóa routeToNearestStopControl:', e);
+          }
+          routeToNearestStopControl = null;
+        }
+        const nearestStopInfo = document.getElementById('nearestStopInfo');
+        nearestStopInfo.innerHTML = '';
       }
     }
 
@@ -511,7 +540,11 @@
     
       // Xóa tất cả lộ trình và marker hiện tại
       Object.keys(routeControls).forEach(rId => {
-        map.removeControl(routeControls[rId]);
+        try {
+          map.removeControl(routeControls[rId]);
+        } catch (e) {
+          console.error('Lỗi khi xóa routeControls:', e);
+        }
         delete routeControls[rId];
       });
     
@@ -630,7 +663,11 @@
     // Vẽ đường đi đến bến xe gần nhất
     function showRouteToNearestStop(start, end) {
       if (routeToNearestStopControl) {
-        map.removeControl(routeToNearestStopControl);
+        try {
+          map.removeControl(routeToNearestStopControl);
+        } catch (e) {
+          console.error('Lỗi khi xóa routeToNearestStopControl:', e);
+        }
         routeToNearestStopControl = null;
       }
 
@@ -640,7 +677,8 @@
         router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
         show: false,
         addWaypoints: false,
-        fitSelectedRoutes: true
+        fitSelectedRoutes: true,
+        createMarker: function() { return null; } // Tắt marker tự động của Leaflet Routing Machine
       }).on('routingerror', (err) => {
         showError('Lỗi định tuyến: ' + (err.error.message || 'Không thể tính toán đường đi đến bến xe!'));
       }).addTo(map);
@@ -670,11 +708,19 @@
         nearestStopMarker = null;
       }
       Object.keys(routeControls).forEach(routeId => {
-        map.removeControl(routeControls[routeId]);
+        try {
+          map.removeControl(routeControls[routeId]);
+        } catch (e) {
+          console.error('Lỗi khi xóa routeControls:', e);
+        }
         delete routeControls[routeId];
       });
       if (routeToNearestStopControl) {
-        map.removeControl(routeToNearestStopControl);
+        try {
+          map.removeControl(routeToNearestStopControl);
+        } catch (e) {
+          console.error('Lỗi khi xóa routeToNearestStopControl:', e);
+        }
         routeToNearestStopControl = null;
       }
     }
