@@ -328,7 +328,9 @@
         Object.entries(data).forEach(([busId, location]) => {
           if (typeof location.lat !== 'number' || typeof location.lng !== 'number') return;
     
-          const label = `Xe buýt ${busId}`;
+          // Tạo label dựa trên busId
+          const busNumber = busId.match(/\d+$/)[0]; // Lấy số từ busId (ví dụ: "001" -> "1")
+          const label = `Xe buýt số ${busNumber}`;
           const timestamp = new Date(location.timestamp).toLocaleString();
     
           // Thêm tuyến vào danh sách tuyến hiện tại
@@ -349,14 +351,13 @@
             };
             markers[loc.id] = L.marker([loc.lat, loc.lng], { icon: busIcon })
               .addTo(map)
-              .bindPopup(`<b>${loc.label}</b><br>Vị trí: ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}<br>Thời gian: ${loc.timestamp}`);
+              .bindPopup(`<b>${loc.label}</b><br>Tuyến: ${busId}<br>Vị trí: ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}<br>Thời gian: ${loc.timestamp}`);
           }
         });
     
         // Xóa các tuyến không còn trong API response
         Object.keys(allowedRoutes).forEach(routeId => {
           if (!currentRoutes.has(routeId)) {
-            // Xóa lộ trình và marker của tuyến nếu không được chọn
             if (routeControls[routeId]) {
               try {
                 map.removeControl(routeControls[routeId]);
@@ -395,11 +396,9 @@
         }
       });
 
-      // Khôi phục lựa chọn trước đó nếu tuyến vẫn tồn tại
       if (selectedRoute && allowedRoutes[selectedRoute]) {
         routeSelect.value = selectedRoute;
       } else {
-        // Nếu tuyến được chọn không còn tồn tại, xóa lộ trình, marker và bến xe gần nhất
         Object.keys(routeControls).forEach(routeId => {
           try {
             map.removeControl(routeControls[routeId]);
@@ -411,7 +410,6 @@
         Object.keys(routeStopMarkers).forEach(routeId => {
           clearRouteStopMarkers(routeId);
         });
-        // Xóa marker và thông tin bến xe gần nhất
         if (nearestStopMarker) {
           map.removeLayer(nearestStopMarker);
           nearestStopMarker = null;
@@ -538,7 +536,6 @@
         return;
       }
     
-      // Xóa tất cả lộ trình và marker hiện tại
       Object.keys(routeControls).forEach(rId => {
         try {
           map.removeControl(routeControls[rId]);
@@ -634,8 +631,7 @@
 
           const nearestStopInfo = document.getElementById('nearestStopInfo');
           nearestStopInfo.innerHTML = `
-            <div>
-            <strong>Bến xe gần nhất:</strong> Bến ${nearestIndex + 1} (Tuyến ${routeId})</div>
+            <div><strong>Bến xe gần nhất:</strong> Bến ${nearestIndex + 1} (Tuyến ${routeId})</div>
             <div><strong>Vị trí:</strong> ${nearestStop.lat.toFixed(5)}, ${nearestStop.lng.toFixed(5)}</div>
             <div><strong>Khoảng cách:</strong> ${minDistance.toFixed(2)} km</div>
             <button id="showRouteToStopBtn" class="center-btn">Hiển thị đường đi</button>
@@ -678,7 +674,7 @@
         show: false,
         addWaypoints: false,
         fitSelectedRoutes: true,
-        createMarker: function() { return null; } // Tắt marker tự động của Leaflet Routing Machine
+        createMarker: function() { return null; }
       }).on('routingerror', (err) => {
         showError('Lỗi định tuyến: ' + (err.error.message || 'Không thể tính toán đường đi đến bến xe!'));
       }).addTo(map);
@@ -744,5 +740,5 @@
     window.addEventListener('load', loadRoutes);
     setInterval(loadLocations, 5000); // API tự động làm mới sau 5 giây
   </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9341bc436b00456c',t:'MTc0NTI4OTQwNi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9341bc436b00456c',t:'MTc0NTI4OTQwNi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9344cf17ac0abce3',t:'MTc0NTMyMTYzNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
