@@ -359,7 +359,7 @@
         // Xóa các tuyến quá 60 giây
         Object.keys(allowedRoutes).forEach(routeId => {
           if (!currentRoutes.has(routeId) && (now - allowedRoutes[routeId].lastUpdated) > 60000) {
-            // Xóa lộ trình và marker của tuyến
+            // Xóa lộ trình và marker của tuyến nếu không được chọn
             if (routeControls[routeId]) {
               map.removeControl(routeControls[routeId]);
               delete routeControls[routeId];
@@ -376,68 +376,6 @@
       } catch (error) {
         console.error('Lỗi tải vị trí:', error);
         showError('Không thể tải dữ liệu: ' + error.message);
-      }
-    }
-
-    // Vẽ lộ trình cho tất cả các tuyến đang hoạt động
-    function drawRoutesForAllowedRoutes() {
-      // Xóa các lộ trình cũ không còn trong allowedRoutes
-      Object.keys(routeControls).forEach(routeId => {
-        if (!allowedRoutes[routeId]) {
-          map.removeControl(routeControls[routeId]);
-          delete routeControls[routeId];
-        }
-      });
-    
-      Object.keys(allowedRoutes).forEach(routeId => {
-        const route = routesData[routeId];
-        if (!route || route.length === 0) {
-          showError('Không có dữ liệu lộ trình cho tuyến ' + routeId);
-          return;
-        }
-    
-        // Chỉ vẽ lại nếu lộ trình chưa có trên bản đồ
-        if (!routeControls[routeId]) {
-          const waypoints = simplifyWaypoints(route.map(point => L.latLng(point[0], point[1])));
-          routeControls[routeId] = L.Routing.control({
-            waypoints: waypoints,
-            lineOptions: { styles: [{ color: routeColors[routeId] || '#ff0000', weight: 6, opacity: 0.9 }] },
-            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-            show: false,
-            addWaypoints: false,
-            fitSelectedRoutes: false
-          }).on('routingerror', (err) => {
-            showError('Lỗi định tuyến: ' + (err.error.message || 'Không thể tính toán lộ trình!'));
-          }).addTo(map);
-    
-          // Hiển thị các điểm dừng (marker)
-          if (routeStopMarkers[routeId]) {
-            routeStopMarkers[routeId].forEach(marker => map.removeLayer(marker.marker));
-          }
-          routeStopMarkers[routeId] = [];
-          route.forEach((point, index) => {
-            const marker = L.marker([point[0], point[1]], { icon: busStopIcon })
-              .addTo(map)
-              .bindPopup(`Trạm ${index + 1} (${routeId})`);
-            routeStopMarkers[routeId].push({
-              marker: marker,
-              lat: point[0],
-              lng: point[1]
-            });
-          });
-        }
-      });
-    
-      // Điều chỉnh bản đồ để hiển thị tất cả các tuyến
-      const allWaypoints = [];
-      Object.values(allowedRoutes).forEach((_, routeId) => {
-        const route = routesData[routeId];
-        if (route) {
-          allWaypoints.push(...route.map(point => L.latLng(point[0], point[1])));
-        }
-      });
-      if (allWaypoints.length > 0) {
-        map.fitBounds(new L.LatLngBounds(allWaypoints));
       }
     }
 
@@ -460,9 +398,6 @@
       if (selectedRoute && allowedRoutes[selectedRoute]) {
         routeSelect.value = selectedRoute;
       }
-
-      // Vẽ lại tất cả các tuyến
-      drawRoutesForAllowedRoutes();
     }
 
     // Di chuyển bản đồ về vị trí hiện tại
@@ -574,13 +509,12 @@
         return;
       }
     
-      // Xóa tất cả lộ trình hiện tại
+      // Xóa tất cả lộ trình và marker hiện tại
       Object.keys(routeControls).forEach(rId => {
         map.removeControl(routeControls[rId]);
         delete routeControls[rId];
       });
     
-      // Xóa tất cả marker điểm dừng hiện tại
       Object.keys(routeStopMarkers).forEach(rId => {
         clearRouteStopMarkers(rId);
       });
